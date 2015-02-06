@@ -3,11 +3,7 @@ use std::fmt;
 use std::old_io as io;
 use std::ffi;
 use std::os;
-use libc::funcs::posix88::fcntl::open;
-use libc::funcs::posix88::unistd::{read, write};
-use libc::types::os::arch::c95::{c_int, size_t};
-use libc::types::os::arch::posix88::mode_t;
-use libc::types::common::c95::c_void;
+use libc::{open, read, write, close, c_int, size_t, mode_t, c_void};
 
 #[macro_export]
 macro_rules! usage_err {
@@ -128,4 +124,9 @@ pub fn write_wip(fd: u32, buf: &[u8]) -> Result<u32, usize> {
     let buf_len = buf.len() as size_t;
     let bytes_written = unsafe { write(fd as c_int, buf_ptr, buf_len) };
     if bytes_written == -1 { Err(os::errno()) } else { Ok(bytes_written as u32) }
+}
+
+pub fn close_wip(fd: u32) -> Result<(), usize> {
+    let status = unsafe { close(fd as c_int) };
+    if status == -1 { Err(os::errno()) } else { Ok(()) }
 }

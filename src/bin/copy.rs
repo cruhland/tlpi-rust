@@ -8,14 +8,13 @@ extern crate libc;
 
 use std::os;
 use tlpi_rust::util;
-use libc::consts::os::posix88::*;
+use libc::{EXIT_SUCCESS, EXIT_FAILURE, O_RDONLY, O_CREAT, O_WRONLY, O_TRUNC};
 
 const BUF_SIZE: usize = 1024;
 
 fn main() {
-    if !main_with_io() {
-        os::set_exit_status(libc::consts::os::c95::EXIT_FAILURE as isize);
-    }
+    let status = if main_with_io() { EXIT_SUCCESS } else { EXIT_FAILURE };
+    os::set_exit_status(status as isize);
 }
 
 fn main_with_io() -> bool {
@@ -60,7 +59,17 @@ fn main_with_io() -> bool {
         };
     }
 
-    // TODO close() files
+    // Clean up
+
+    match util::close_wip(input_fd) {
+        Err(errno) => return err_exit!(errno, "close input"),
+        _ => {}
+    };
+
+    match util::close_wip(output_fd) {
+        Err(errno) => return err_exit!(errno, "close output"),
+        _ => {}
+    };
 
     true
 }

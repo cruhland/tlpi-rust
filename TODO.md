@@ -1,4 +1,4 @@
-- Finish implementation of copy.rs
+- Macro for errno handling?
 - Clean up return types of util.rs functions
   - Make errno a newtype
   - Make fd a newtype
