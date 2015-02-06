@@ -1,0 +1,11 @@
+
+[package]
+
+name = "tlpi_rust"
+version = "0.0.1"
+authors = [ "Charles Ruhland <cruhland@alumni.cmu.edu>" ]
+
+
+[[bin]]
+
+name = "copy"
