@@ -1,6 +1,4 @@
-- Macro for errno handling?
-- Clean up return types of util.rs functions
-  - Make errno a newtype
+- Clean up util.rs syscall functions
   - Make fd a newtype
   - Use semantically meaningful int types (e.g., usize vs. u32)
   - Use impl to make open, read, write, and close methods of fd

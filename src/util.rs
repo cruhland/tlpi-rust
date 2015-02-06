@@ -28,7 +28,7 @@ macro_rules! fatal {
 
 macro_rules! errno_check {
     ($status:expr, $success:expr) => (
-        if $status == -1 { Err(os::errno()) } else { Ok($success) }
+        if $status == -1 { Err(Errno(os::errno())) } else { Ok($success) }
     )
 }
 
@@ -87,7 +87,8 @@ pub fn usage_err_fmt(fmt: fmt::Arguments) -> bool {
     false
 }
 
-pub fn err_exit_fmt(err: usize, fmt: fmt::Arguments) -> bool {
+pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> bool {
+    let Errno(err) = errno;
     let error_name =
         if err > 0 && err < ENAME.len() { ENAME[err] } else { "?UNKNOWN?" };
     let io_error = io::IoError::from_errno(err, true);
@@ -112,27 +113,32 @@ pub fn fatal_fmt(fmt: fmt::Arguments) -> bool {
     false
 }
 
-pub fn open_wip(path: String, oflag: c_int, mode: mode_t) -> Result<u32, usize> {
+#[derive(Copy)]
+pub struct Errno(usize);
+
+pub type SysResult<T> = Result<T, Errno>;
+
+pub fn open_wip(path: String, oflag: c_int, mode: mode_t) -> SysResult<u32> {
     let cstring_path = ffi::CString::from_vec(path.into_bytes());
     let fd = unsafe { open(cstring_path.as_ptr(), oflag, mode) };
     errno_check!(fd, fd as u32)
 }
 
-pub fn read_wip(fd: u32, buf: &mut [u8]) -> Result<u32, usize> {
+pub fn read_wip(fd: u32, buf: &mut [u8]) -> SysResult<u32> {
     let buf_ptr = buf.as_mut_ptr() as *mut c_void;
     let buf_len = buf.len() as size_t;
     let bytes_read = unsafe { read(fd as c_int, buf_ptr, buf_len) };
     errno_check!(bytes_read, bytes_read as u32)
 }
 
-pub fn write_wip(fd: u32, buf: &[u8]) -> Result<u32, usize> {
+pub fn write_wip(fd: u32, buf: &[u8]) -> SysResult<u32> {
     let buf_ptr = buf.as_ptr() as *const c_void;
     let buf_len = buf.len() as size_t;
     let bytes_written = unsafe { write(fd as c_int, buf_ptr, buf_len) };
     errno_check!(bytes_written, bytes_written as u32)
 }
 
-pub fn close_wip(fd: u32) -> Result<(), usize> {
+pub fn close_wip(fd: u32) -> SysResult<()> {
     let status = unsafe { close(fd as c_int) };
     errno_check!(status, ())
 }
