@@ -47,18 +47,16 @@ fn main_with_io() -> bool {
 
     let mut buf = [0u8; BUF_SIZE];
     loop {
-        match util::read_wip(input_fd, buf.as_mut_slice()) {
+        let bytes_read = match util::read_wip(input_fd, buf.as_mut_slice()) {
             Ok(0) => break,
-            Ok(num_read) => {
-                match util::write_wip(output_fd, &buf[..num_read as usize]) {
-                    Ok(num_written) if num_read == num_written => {},
-                    Ok(_) => return fatal!("couldn't write whole buffer"),
-                    Err(errno) => {
-                        return err_exit!(errno, "writing file {}", argv[2])
-                    }
-                };
-            },
+            Ok(bytes) => bytes,
             Err(errno) => return err_exit!(errno, "reading file {}", argv[1])
+        };
+
+        match util::write_wip(output_fd, &buf[..bytes_read as usize]) {
+            Ok(bytes_written) if bytes_read == bytes_written => {},
+            Ok(_) => return fatal!("couldn't write whole buffer"),
+            Err(errno) => return err_exit!(errno, "writing file {}", argv[2])
         };
     }
 
