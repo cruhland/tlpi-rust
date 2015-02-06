@@ -26,6 +26,12 @@ macro_rules! fatal {
     )
 }
 
+macro_rules! errno_check {
+    ($status:expr, $success:expr) => (
+        if $status == -1 { Err(os::errno()) } else { Ok($success) }
+    )
+}
+
 static ENAME: [&'static str; 134] = [
     "",
     "EPERM", "ENOENT", "ESRCH", "EINTR", "EIO", "ENXIO",
@@ -109,24 +115,24 @@ pub fn fatal_fmt(fmt: fmt::Arguments) -> bool {
 pub fn open_wip(path: String, oflag: c_int, mode: mode_t) -> Result<u32, usize> {
     let cstring_path = ffi::CString::from_vec(path.into_bytes());
     let fd = unsafe { open(cstring_path.as_ptr(), oflag, mode) };
-    if fd == -1 { Err(os::errno()) } else { Ok(fd as u32) }
+    errno_check!(fd, fd as u32)
 }
 
 pub fn read_wip(fd: u32, buf: &mut [u8]) -> Result<u32, usize> {
     let buf_ptr = buf.as_mut_ptr() as *mut c_void;
     let buf_len = buf.len() as size_t;
     let bytes_read = unsafe { read(fd as c_int, buf_ptr, buf_len) };
-    if bytes_read == -1 { Err(os::errno()) } else { Ok(bytes_read as u32) }
+    errno_check!(bytes_read, bytes_read as u32)
 }
 
 pub fn write_wip(fd: u32, buf: &[u8]) -> Result<u32, usize> {
     let buf_ptr = buf.as_ptr() as *const c_void;
     let buf_len = buf.len() as size_t;
     let bytes_written = unsafe { write(fd as c_int, buf_ptr, buf_len) };
-    if bytes_written == -1 { Err(os::errno()) } else { Ok(bytes_written as u32) }
+    errno_check!(bytes_written, bytes_written as u32)
 }
 
 pub fn close_wip(fd: u32) -> Result<(), usize> {
     let status = unsafe { close(fd as c_int) };
-    if status == -1 { Err(os::errno()) } else { Ok(()) }
+    errno_check!(status, ())
 }

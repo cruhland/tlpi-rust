@@ -1,5 +1,5 @@
 
-#![feature(libc, io, std_misc, os)]
+#![feature(libc, io, std_misc)]
 extern crate libc;
 
 pub mod util;
