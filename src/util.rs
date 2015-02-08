@@ -116,43 +116,43 @@ pub fn fatal_fmt(fmt: fmt::Arguments) -> bool {
 #[derive(Copy)]
 pub struct Errno(usize);
 
+pub type SysResult<T> = Result<T, Errno>;
+
 #[derive(Copy)] // Temporary; will remove once Drop is implemented
 pub struct FileDescriptor(c_int);
 
 impl FileDescriptor {
 
-    fn raw(&self) -> c_int {
-        let &FileDescriptor(fd) = self;
+    pub fn open(
+        path: String, oflag: c_int, mode: mode_t
+    ) -> SysResult<FileDescriptor> {
+        let cstring_path = ffi::CString::from_vec(path.into_bytes());
+        let fd = unsafe { open(cstring_path.as_ptr(), oflag, mode) };
+        errno_check!(fd, FileDescriptor(fd))
+    }
+
+    pub fn read(self, buf: &mut [u8]) -> SysResult<usize> {
+        let buf_ptr = buf.as_mut_ptr() as *mut c_void;
+        let buf_len = buf.len() as size_t;
+        let bytes_read = unsafe { read(self.raw(), buf_ptr, buf_len) };
+        errno_check!(bytes_read, bytes_read as usize)
+    }
+
+    pub fn write(self, buf: &[u8]) -> SysResult<usize> {
+        let buf_ptr = buf.as_ptr() as *const c_void;
+        let buf_len = buf.len() as size_t;
+        let bytes_written = unsafe { write(self.raw(), buf_ptr, buf_len) };
+        errno_check!(bytes_written, bytes_written as usize)
+    }
+
+    pub fn close(self) -> SysResult<()> {
+        let status = unsafe { close(self.raw()) };
+        errno_check!(status, ())
+    }
+
+    fn raw(self) -> c_int {
+        let FileDescriptor(fd) = self;
         fd
     }
 
-}
-
-pub type SysResult<T> = Result<T, Errno>;
-
-pub fn open_wip(
-    path: String, oflag: c_int, mode: mode_t
-) -> SysResult<FileDescriptor> {
-    let cstring_path = ffi::CString::from_vec(path.into_bytes());
-    let fd = unsafe { open(cstring_path.as_ptr(), oflag, mode) };
-    errno_check!(fd, FileDescriptor(fd))
-}
-
-pub fn read_wip(fd: FileDescriptor, buf: &mut [u8]) -> SysResult<usize> {
-    let buf_ptr = buf.as_mut_ptr() as *mut c_void;
-    let buf_len = buf.len() as size_t;
-    let bytes_read = unsafe { read(fd.raw(), buf_ptr, buf_len) };
-    errno_check!(bytes_read, bytes_read as usize)
-}
-
-pub fn write_wip(fd: FileDescriptor, buf: &[u8]) -> SysResult<usize> {
-    let buf_ptr = buf.as_ptr() as *const c_void;
-    let buf_len = buf.len() as size_t;
-    let bytes_written = unsafe { write(fd.raw(), buf_ptr, buf_len) };
-    errno_check!(bytes_written, bytes_written as usize)
-}
-
-pub fn close_wip(fd: FileDescriptor) -> SysResult<()> {
-    let status = unsafe { close(fd.raw()) };
-    errno_check!(status, ())
 }

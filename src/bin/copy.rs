@@ -7,7 +7,7 @@ extern crate tlpi_rust;
 extern crate libc;
 
 use std::os;
-use tlpi_rust::util;
+use tlpi_rust::util::FileDescriptor;
 use libc::{EXIT_SUCCESS, EXIT_FAILURE, O_RDONLY, O_CREAT, O_WRONLY, O_TRUNC};
 
 const BUF_SIZE: usize = 1024;
@@ -27,7 +27,7 @@ fn main_with_io() -> bool {
     // Open input and output files
 
     let src_path = argv[1].clone();
-    let input_fd = match util::open_wip(src_path, O_RDONLY, 0) {
+    let input_fd = match FileDescriptor::open(src_path, O_RDONLY, 0) {
         Ok(fd) => fd,
         Err(errno) => return err_exit!(errno, "opening file {}", argv[1])
     };
@@ -37,7 +37,7 @@ fn main_with_io() -> bool {
     let file_perms = 0o666; // rw-rw-rw
 
     let dst_path = argv[2].clone();
-    let output_fd = match util::open_wip(dst_path, open_flags, file_perms) {
+    let output_fd = match FileDescriptor::open(dst_path, open_flags, file_perms) {
         Ok(fd) => fd,
         Err(errno) => return err_exit!(errno, "opening file {}", argv[2])
     };
@@ -46,13 +46,13 @@ fn main_with_io() -> bool {
 
     let mut buf = [0u8; BUF_SIZE];
     loop {
-        let bytes_read = match util::read_wip(input_fd, buf.as_mut_slice()) {
+        let bytes_read = match input_fd.read(buf.as_mut_slice()) {
             Ok(0) => break,
             Ok(bytes) => bytes,
             Err(errno) => return err_exit!(errno, "reading file {}", argv[1])
         };
 
-        match util::write_wip(output_fd, &buf[..bytes_read as usize]) {
+        match output_fd.write(&buf[..bytes_read as usize]) {
             Ok(bytes_written) if bytes_read == bytes_written => {},
             Ok(_) => return fatal!("couldn't write whole buffer"),
             Err(errno) => return err_exit!(errno, "writing file {}", argv[2])
@@ -61,12 +61,12 @@ fn main_with_io() -> bool {
 
     // Clean up
 
-    match util::close_wip(input_fd) {
+    match input_fd.close() {
         Err(errno) => return err_exit!(errno, "close input"),
         _ => {}
     };
 
-    match util::close_wip(output_fd) {
+    match output_fd.close() {
         Err(errno) => return err_exit!(errno, "close output"),
         _ => {}
     };
