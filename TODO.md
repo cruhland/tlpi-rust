@@ -1,5 +1,5 @@
 - Clean up util.rs syscall functions
-  - Use semantically meaningful int types (e.g., usize vs. u32)
   - Use impl to make open, read, write, and close methods of fd
   - Use move semantics to avoid an explicit close() call
+  - Maybe provide stronger types for oflag and mode arguments?
 - See if we can use move semantics to avoid reusing the buffer

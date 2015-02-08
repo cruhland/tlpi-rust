@@ -138,18 +138,18 @@ pub fn open_wip(
     errno_check!(fd, FileDescriptor(fd))
 }
 
-pub fn read_wip(fd: FileDescriptor, buf: &mut [u8]) -> SysResult<u32> {
+pub fn read_wip(fd: FileDescriptor, buf: &mut [u8]) -> SysResult<usize> {
     let buf_ptr = buf.as_mut_ptr() as *mut c_void;
     let buf_len = buf.len() as size_t;
     let bytes_read = unsafe { read(fd.raw(), buf_ptr, buf_len) };
-    errno_check!(bytes_read, bytes_read as u32)
+    errno_check!(bytes_read, bytes_read as usize)
 }
 
-pub fn write_wip(fd: FileDescriptor, buf: &[u8]) -> SysResult<u32> {
+pub fn write_wip(fd: FileDescriptor, buf: &[u8]) -> SysResult<usize> {
     let buf_ptr = buf.as_ptr() as *const c_void;
     let buf_len = buf.len() as size_t;
     let bytes_written = unsafe { write(fd.raw(), buf_ptr, buf_len) };
-    errno_check!(bytes_written, bytes_written as u32)
+    errno_check!(bytes_written, bytes_written as usize)
 }
 
 pub fn close_wip(fd: FileDescriptor) -> SysResult<()> {
