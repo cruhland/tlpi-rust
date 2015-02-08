@@ -1,5 +1,4 @@
 - Clean up util.rs syscall functions
-  - Make fd a newtype
   - Use semantically meaningful int types (e.g., usize vs. u32)
   - Use impl to make open, read, write, and close methods of fd
   - Use move semantics to avoid an explicit close() call
