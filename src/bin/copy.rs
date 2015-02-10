@@ -1,12 +1,12 @@
 
-#![feature(libc, os)]
+#![feature(libc, os, env)]
 
 #[macro_use]
 extern crate tlpi_rust;
 
 extern crate libc;
 
-use std::os;
+use std::env;
 use tlpi_rust::util::FileDescriptor;
 use libc::{EXIT_SUCCESS, EXIT_FAILURE, O_RDONLY, O_CREAT, O_WRONLY, O_TRUNC};
 
@@ -14,11 +14,12 @@ const BUF_SIZE: usize = 1024;
 
 fn main() {
     let status = if main_with_io() { EXIT_SUCCESS } else { EXIT_FAILURE };
-    os::set_exit_status(status as isize);
+    env::set_exit_status(status);
 }
 
 fn main_with_io() -> bool {
-    let argv = os::args();
+    let argv: Vec<_> =
+        env::args().filter_map(|arg| arg.into_string().ok()).collect();
 
     if argv.len() != 3 || argv[1] == "--help" {
         return usage_err!("{} old-file new-file", argv[0]);
