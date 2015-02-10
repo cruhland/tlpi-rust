@@ -118,12 +118,7 @@ pub struct Errno(usize);
 
 pub type SysResult<T> = Result<T, Errno>;
 
-pub struct FileDescriptor {
-    fd: c_int,
-    // We need to prevent drop() from closing the fd if close()
-    // was already called
-    is_open: bool
-}
+pub struct FileDescriptor(c_int);
 
 impl FileDescriptor {
 
@@ -132,45 +127,33 @@ impl FileDescriptor {
     ) -> SysResult<FileDescriptor> {
         let cstring_path = ffi::CString::from_vec(path.into_bytes());
         let fd = unsafe { open(cstring_path.as_ptr(), oflag, mode) };
-        errno_check!(fd, FileDescriptor { fd: fd, is_open: true })
+        errno_check!(fd, FileDescriptor(fd))
     }
 
     pub fn read(&self, buf: &mut [u8]) -> SysResult<usize> {
         let buf_ptr = buf.as_mut_ptr() as *mut c_void;
         let buf_len = buf.len() as size_t;
-        let bytes_read = unsafe { read(self.fd, buf_ptr, buf_len) };
+        let bytes_read = unsafe { read(self.raw(), buf_ptr, buf_len) };
         errno_check!(bytes_read, bytes_read as usize)
     }
 
     pub fn write(&self, buf: &[u8]) -> SysResult<usize> {
         let buf_ptr = buf.as_ptr() as *const c_void;
         let buf_len = buf.len() as size_t;
-        let bytes_written = unsafe { write(self.fd, buf_ptr, buf_len) };
+        let bytes_written = unsafe { write(self.raw(), buf_ptr, buf_len) };
         errno_check!(bytes_written, bytes_written as usize)
     }
 
-    // This allows us to safely obtain error information that
-    // would kill this task if we used drop() instead
-    pub fn close(mut self) -> SysResult<()> { self.close_ref() }
-
-    fn close_ref(&mut self) -> SysResult<()> {
-        let status = unsafe { close(self.fd) };
-        // Mark it closed even if the call failed; the man page for
-        // close() says that retries are not recommended
-        self.is_open = false;
+    // We cannot safely provide a Drop impl to handle this automatically;
+    // it does not provide a mechanism for handling errors
+    pub fn close(self) -> SysResult<()> {
+        let status = unsafe { close(self.raw()) };
         errno_check!(status, ())
     }
 
-}
-
-impl Drop for FileDescriptor {
-
-    fn drop(&mut self) {
-        if self.is_open {
-            // This could potentially fail; if it's a problem,
-            // call close() explicitly to handle the error
-            self.close_ref().ok().unwrap()
-        }
+    fn raw(&self) -> c_int {
+        let &FileDescriptor(fd) = self;
+        fd
     }
 
 }
