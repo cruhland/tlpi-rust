@@ -1,3 +1,2 @@
 - Clean up util.rs syscall functions
   - Maybe provide stronger types for oflag and mode arguments?
-- See if we can use move semantics to avoid reusing the buffer
