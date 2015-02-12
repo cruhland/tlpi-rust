@@ -146,15 +146,35 @@ bitflags! {
     }
 }
 
+bitflags! {
+    flags FilePerms: mode_t {
+        const S_ISUID = 0b100_000_000_000,
+        const S_ISGID = 0b010_000_000_000,
+        const S_ISVTX = 0b001_000_000_000,
+        const S_IRUSR = 0b000_100_000_000,
+        const S_IWUSR = 0b000_010_000_000,
+        const S_IXUSR = 0b000_001_000_000,
+        const S_IRGRP = 0b000_000_100_000,
+        const S_IWGRP = 0b000_000_010_000,
+        const S_IXGRP = 0b000_000_001_000,
+        const S_IROTH = 0b000_000_000_100,
+        const S_IWOTH = 0b000_000_000_010,
+        const S_IXOTH = 0b000_000_000_001,
+        const S_IRWXU = S_IRUSR.bits | S_IWUSR.bits | S_IXUSR.bits,
+        const S_IRWXG = S_IRGRP.bits | S_IWGRP.bits | S_IXGRP.bits,
+        const S_IRWXO = S_IROTH.bits | S_IWOTH.bits | S_IXOTH.bits,
+    }
+}
+
 pub struct FileDescriptor(c_int);
 
 impl FileDescriptor {
 
     pub fn open(
-        path: String, flags: OpenFlags, mode: mode_t
+        path: String, flags: OpenFlags, mode: FilePerms
     ) -> SysResult<FileDescriptor> {
-        let cstring_path = ffi::CString::from_vec(path.into_bytes());
-        let fd = unsafe { open(cstring_path.as_ptr(), flags.bits(), mode) };
+        let cstring_path = ffi::CString::from_vec(path.into_bytes()).as_ptr();
+        let fd = unsafe { open(cstring_path, flags.bits(), mode.bits()) };
         errno_check!(fd, FileDescriptor(fd))
     }
 

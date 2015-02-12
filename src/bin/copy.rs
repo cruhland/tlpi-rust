@@ -7,7 +7,7 @@ extern crate tlpi_rust;
 extern crate libc;
 
 use std::env;
-use tlpi_rust::util::{FileDescriptor, O_RDONLY, O_CREAT, O_WRONLY, O_TRUNC};
+use tlpi_rust::util::*;
 use libc::{EXIT_SUCCESS, EXIT_FAILURE};
 
 const BUF_SIZE: usize = 1024;
@@ -28,14 +28,16 @@ fn main_with_io() -> bool {
     // Open input and output files
 
     let src_path = argv[1].clone();
-    let input_fd = match FileDescriptor::open(src_path, O_RDONLY, 0) {
+    let empty_perms = FilePerms::empty();
+    let input_fd = match FileDescriptor::open(src_path, O_RDONLY, empty_perms) {
         Ok(fd) => fd,
         Err(errno) => return err_exit!(errno, "opening file {}", argv[1])
     };
 
     let open_flags = O_CREAT | O_WRONLY | O_TRUNC;
 
-    let file_perms = 0o666; // rw-rw-rw
+    // rw-rw-rw
+    let file_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
 
     let dst_path = argv[2].clone();
     let output_fd = match FileDescriptor::open(dst_path, open_flags, file_perms) {
