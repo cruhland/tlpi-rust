@@ -118,15 +118,43 @@ pub struct Errno(usize);
 
 pub type SysResult<T> = Result<T, Errno>;
 
+// open() flags on my x86-64 Linux system
+// Not intended to be portable!
+bitflags! {
+    flags OpenFlags: c_int {
+        const O_ACCMODE   = 0b0000_0000_0000_0000_0000_0011,
+        const O_RDONLY    = 0b0000_0000_0000_0000_0000_0000,
+        const O_WRONLY    = 0b0000_0000_0000_0000_0000_0001,
+        const O_RDWR      = 0b0000_0000_0000_0000_0000_0010,
+        const O_CREAT     = 0b0000_0000_0000_0000_0100_0000,
+        const O_EXCL      = 0b0000_0000_0000_0000_1000_0000,
+        const O_NOCTTY    = 0b0000_0000_0000_0001_0000_0000,
+        const O_TRUNC     = 0b0000_0000_0000_0010_0000_0000,
+        const O_APPEND    = 0b0000_0000_0000_0100_0000_0000,
+        const O_NONBLOCK  = 0b0000_0000_0000_1000_0000_0000,
+        const O_NDELAY    = 0b0000_0000_0000_1000_0000_0000,
+        const O_DSYNC     = 0b0000_0000_0001_0000_0000_0000,
+        const O_DIRECT    = 0b0000_0000_0100_0000_0000_0000,
+        const O_LARGEFILE = 0b0000_0000_1000_0000_0000_0000,
+        const O_DIRECTORY = 0b0000_0001_0000_0000_0000_0000,
+        const O_NOFOLLOW  = 0b0000_0010_0000_0000_0000_0000,
+        const O_NOATIME   = 0b0000_0100_0000_0000_0000_0000,
+        const O_CLOEXEC   = 0b0000_1000_0000_0000_0000_0000,
+        const O_SYNC      = 0b0001_0000_0001_0000_0000_0000,
+        const O_PATH      = 0b0010_0000_0000_0000_0000_0000,
+        const O_TMPFILE   = 0b0100_0001_0000_0000_0000_0000,
+    }
+}
+
 pub struct FileDescriptor(c_int);
 
 impl FileDescriptor {
 
     pub fn open(
-        path: String, oflag: c_int, mode: mode_t
+        path: String, flags: OpenFlags, mode: mode_t
     ) -> SysResult<FileDescriptor> {
         let cstring_path = ffi::CString::from_vec(path.into_bytes());
-        let fd = unsafe { open(cstring_path.as_ptr(), oflag, mode) };
+        let fd = unsafe { open(cstring_path.as_ptr(), flags.bits(), mode) };
         errno_check!(fd, FileDescriptor(fd))
     }
 

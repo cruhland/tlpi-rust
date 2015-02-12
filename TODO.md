@@ -1,2 +1,5 @@
-- Clean up util.rs syscall functions
-  - Maybe provide stronger types for oflag and mode arguments?
+- Soon
+  - Clean up util.rs syscall functions
+    - Maybe provide stronger types for mode argument?
+- Later
+  - Provide script for generating tlpi_rust::util::OpenFlags from a C header file

@@ -5,6 +5,9 @@ name = "tlpi_rust"
 version = "0.0.1"
 authors = [ "Charles Ruhland <cruhland@alumni.cmu.edu>" ]
 
+[dependencies]
+
+bitflags = "0.1.1"
 
 [[bin]]
 
