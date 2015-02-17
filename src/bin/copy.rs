@@ -1,5 +1,5 @@
 
-#![feature(libc, os, env)]
+#![feature(libc, env)]
 
 #[macro_use]
 extern crate tlpi_rust;
@@ -18,8 +18,7 @@ fn main() {
 }
 
 fn main_with_io() -> bool {
-    let argv: Vec<_> =
-        env::args().filter_map(|arg| arg.into_string().ok()).collect();
+    let argv: Vec<_> = env::args().collect();
 
     if argv.len() != 3 || argv[1] == "--help" {
         return usage_err!("{} old-file new-file", argv[0]);
