@@ -6,4 +6,5 @@ extern crate libc;
 #[macro_use]
 extern crate bitflags;
 
-pub mod util;
+pub mod err;
+pub mod fd;

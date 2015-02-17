@@ -7,7 +7,7 @@ extern crate tlpi_rust;
 extern crate libc;
 
 use std::env;
-use tlpi_rust::util::*;
+use tlpi_rust::fd::*;
 use libc::{EXIT_SUCCESS, EXIT_FAILURE};
 
 const BUF_SIZE: usize = 1024;
