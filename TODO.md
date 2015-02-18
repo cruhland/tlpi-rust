@@ -1,4 +1,6 @@
 - Soon
   - Clean up util.rs (split up, add comments)
 - Later
+  - Stop using old_io
+  - Provide script for generating the `ENAME` array in `err.rs`
   - Provide script for generating tlpi_rust::util::OpenFlags from a C header file
