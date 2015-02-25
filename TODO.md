@@ -1,5 +1,5 @@
 - Soon
-  - Clean up util.rs (split up, add comments)
+  - Next example program
 - Later
   - Stop using old_io
   - Provide script for generating the `ENAME` array in `err.rs`

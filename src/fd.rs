@@ -28,7 +28,7 @@ macro_rules! errno_check {
 
 impl FileDescriptor {
 
-    /// The `open` system call.
+    /// The `open()` system call.
     ///
     /// ## Arguments
     ///
@@ -44,7 +44,7 @@ impl FileDescriptor {
     /// Returns a new file descriptor on success, or an appropriate
     /// `Errno` on failure.
     ///
-    /// Consult the manpage (command `man 2 open`) for further
+    /// Consult the man page (command `man 2 open`) for further
     /// details.
     pub fn open(
         path: String, flags: OpenFlags, mode: FilePerms
@@ -54,6 +54,13 @@ impl FileDescriptor {
         errno_check!(fd, FileDescriptor { raw: fd, })
     }
 
+    /// The `read()` system call.
+    ///
+    /// Copies up to `buf.len()` bytes from the file into `buf`,
+    /// returning the number of bytes read.
+    ///
+    /// Consult the man page (command `man 2 read`) for further
+    /// details.
     pub fn read(&self, buf: &mut [u8]) -> SysResult<usize> {
         let buf_ptr = buf.as_mut_ptr() as *mut c_void;
         let buf_len = buf.len() as size_t;
@@ -61,6 +68,14 @@ impl FileDescriptor {
         errno_check!(bytes_read, bytes_read as usize)
     }
 
+    /// The `write()` system call.
+    ///
+    /// Attempts to copy `buf` to the file, returning the actual
+    /// number of bytes copied (which may be smaller than `buf.len()`
+    /// in rare circumstances).
+    ///
+    /// Consult the man page (command `man 2 write`) for further
+    /// details.
     pub fn write(&self, buf: &[u8]) -> SysResult<usize> {
         let buf_ptr = buf.as_ptr() as *const c_void;
         let buf_len = buf.len() as size_t;
@@ -68,8 +83,16 @@ impl FileDescriptor {
         errno_check!(bytes_written, bytes_written as usize)
     }
 
-    // We cannot safely provide a Drop impl to handle this automatically;
-    // it does not provide a mechanism for handling errors
+    /// The `close()` system call.
+    ///
+    /// Cleans up kernel resources for the file descriptor; it can no
+    /// longer be used after this call returns. To enforce this at the
+    /// Rust level, the file descriptor is moved into this method and
+    /// is not moved out.
+    ///
+    /// We cannot safely provide a `Drop` impl to handle this
+    /// automatically; it does not provide a mechanism for handling
+    /// errors.
     pub fn close(self) -> SysResult<()> {
         let status = unsafe { close(self.raw) };
         errno_check!(status, ())
@@ -77,9 +100,14 @@ impl FileDescriptor {
 
 }
 
-// open() flags on my x86-64 Linux system
-// Not intended to be portable!
 bitflags! {
+    #[doc = "Access mode, file creation, and file status flags for `open()`"]
+    #[doc = "and related system calls."]
+    #[doc = ""]
+    #[doc = "Consult `man 2 open` for details on each flag."]
+    #[doc = ""]
+    #[doc = "Taken from C header files on an x86-64 Linux system; not"]
+    #[doc = "intended to be portable!"]
     flags OpenFlags: c_int {
         const O_ACCMODE   = 0b0000_0000_0000_0000_0000_0011,
         const O_RDONLY    = 0b0000_0000_0000_0000_0000_0000,
@@ -106,21 +134,40 @@ bitflags! {
 }
 
 bitflags! {
+    #[doc = "File permissions flags."]
+    #[doc = ""]
+    #[doc = "Consult `man 2 stat` for details. The values are portable"]
+    #[doc = "across Unix-based systems."]
     flags FilePerms: mode_t {
+        #[doc = "set-user-ID bit"]
         const S_ISUID = 0b100_000_000_000,
+        #[doc = "set-group-ID bit"]
         const S_ISGID = 0b010_000_000_000,
+        #[doc = "sticky bit"]
         const S_ISVTX = 0b001_000_000_000,
+        #[doc = "owner has read permission"]
         const S_IRUSR = 0b000_100_000_000,
+        #[doc = "owner has write permission"]
         const S_IWUSR = 0b000_010_000_000,
+        #[doc = "owner has execute permission"]
         const S_IXUSR = 0b000_001_000_000,
+        #[doc = "group has read permission"]
         const S_IRGRP = 0b000_000_100_000,
+        #[doc = "group has write permission"]
         const S_IWGRP = 0b000_000_010_000,
+        #[doc = "group has execute permission"]
         const S_IXGRP = 0b000_000_001_000,
+        #[doc = "others have read permission"]
         const S_IROTH = 0b000_000_000_100,
+        #[doc = "others have write permission"]
         const S_IWOTH = 0b000_000_000_010,
+        #[doc = "others have execute permission"]
         const S_IXOTH = 0b000_000_000_001,
+        #[doc = "mask for file owner permissions"]
         const S_IRWXU = S_IRUSR.bits | S_IWUSR.bits | S_IXUSR.bits,
+        #[doc = "mask for group permissions"]
         const S_IRWXG = S_IRGRP.bits | S_IWGRP.bits | S_IXGRP.bits,
+        #[doc = "mask for permissions for others (not in group)"]
         const S_IRWXO = S_IROTH.bits | S_IWOTH.bits | S_IXOTH.bits,
     }
 }
