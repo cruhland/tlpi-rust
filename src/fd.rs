@@ -49,7 +49,8 @@ impl FileDescriptor {
     pub fn open(
         path: String, flags: OpenFlags, mode: FilePerms
     ) -> SysResult<FileDescriptor> {
-        let cstring_path = ffi::CString::from_vec(path.into_bytes()).as_ptr();
+        // Panic if `path` contains nul chars; crude but good enough
+        let cstring_path = ffi::CString::new(path).unwrap().as_ptr();
         let fd = unsafe { open(cstring_path, flags.bits(), mode.bits()) };
         errno_check!(fd, FileDescriptor { raw: fd, })
     }
