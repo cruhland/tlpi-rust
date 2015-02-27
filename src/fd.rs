@@ -3,7 +3,8 @@
 
 use std::ffi;
 use std::os;
-use libc::{open, read, write, close, c_int, size_t, mode_t, c_void};
+use libc::{open, read, write, close, lseek};
+use libc::{c_int, size_t, mode_t, c_void, off_t};
 use err::Errno;
 
 /// The result of a system call.
@@ -94,9 +95,26 @@ impl FileDescriptor {
     /// We cannot safely provide a `Drop` impl to handle this
     /// automatically; it does not provide a mechanism for handling
     /// errors.
+    ///
+    /// Consult the man page (command `man 2 close`) for further
+    /// details.
     pub fn close(self) -> SysResult<()> {
         let status = unsafe { close(self.raw) };
         errno_check!(status, ())
+    }
+
+    /// The `lseek()` system call.
+    ///
+    /// Adjusts the offset of the file to the value of `offset` under
+    /// the interpretation of `whence`.
+    ///
+    /// Consult the man page (command `man 2 lseek`) for further
+    /// details.
+    pub fn lseek(&self, offset: i64, whence: OffsetBase) -> SysResult<u64> {
+        let abs_offset = unsafe {
+            lseek(self.raw, offset as off_t, whence as i32)
+        };
+        errno_check!(abs_offset, abs_offset as u64)
     }
 
 }
@@ -171,4 +189,34 @@ bitflags! {
         #[doc = "mask for permissions for others (not in group)"]
         const S_IRWXO = S_IROTH.bits | S_IWOTH.bits | S_IXOTH.bits,
     }
+}
+
+/// Interpretations for the `offset` argument of `lseek()`.
+pub enum OffsetBase {
+    /// The offset is set to `offset` bytes.
+    SeekSet  = 0,
+    /// The offset is set to its current location plus `offset`
+    /// bytes.
+    SeekCur  = 1,
+    /// The offset is set to the size of the file plus `offset`
+    /// bytes.
+    SeekEnd  = 2,
+    /// Adjust the file offset to the next location in the file ≥
+    /// `offset` which contains data.
+    ///
+    /// If `offset` points to data, then the file offset is set to
+    /// `offset`.
+    ///
+    /// Available since Linux version 3.1.
+    SeekData = 3,
+    /// Adjust the file offset to the next hole in the file ≥
+    /// `offset`.
+    ///
+    /// If `offset` points into the middle of a hole, then the file
+    /// offset is set to `offset`. If there is no hole past `offset`,
+    /// then the file offset is adjusted to the end of the file (i.e.,
+    /// there is an implicit hole at the end of any file).
+    ///
+    /// Available since Linux version 3.1.
+    SeekHole = 4,
 }

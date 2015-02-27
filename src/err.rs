@@ -61,6 +61,21 @@ macro_rules! fatal {
     )
 }
 
+/// Reports command-line argument interpretation errors.
+///
+/// For example, when an integer argument cannot be parsed.
+///
+/// Expects a format string and arguments, like `println!`. The prefix
+/// `"Command-line usage error: "` will be added to the format string
+/// before display on standard error. Returns `false` to indicate
+/// program failure.
+#[macro_export]
+macro_rules! cmd_line_err {
+    ($($arg:tt)*) => (
+        tlpi_rust::err::cmd_line_err_fmt(format_args!($($arg)*))
+    )
+}
+
 /// Helper macro that is used by the other `*_fmt` functions.
 ///
 /// Expects an already-created `fmt::Arguments` value, followed by
@@ -109,6 +124,15 @@ pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> bool {
 /// for other purposes.
 pub fn fatal_fmt(fmt: fmt::Arguments) -> bool {
     write_err!(fmt, "ERROR: ")
+}
+
+/// Performs the same function as `cmd_line_err!`, but takes a
+/// pre-existing `fmt::Arguments` value.
+///
+/// This is mainly an implementation detail, but it might be useful
+/// for other purposes.
+pub fn cmd_line_err_fmt(fmt: fmt::Arguments) -> bool {
+    write_err!(fmt, "Command-line usage error: ")
 }
 
 /// Performs the same function as `write_err!`, but takes a

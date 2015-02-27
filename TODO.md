@@ -1,5 +1,6 @@
 - Soon
   - Next example program
+  - Make fd::FileDescriptor a newtype and use .0 syntax
 - Later
   - Stop using old_io
   - Use proper Error types in library functions and example programs
