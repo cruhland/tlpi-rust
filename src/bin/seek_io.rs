@@ -4,16 +4,12 @@
 #[macro_use]
 extern crate tlpi_rust;
 
-extern crate libc;
-
 use std::env;
 use tlpi_rust::fd::*;
-use libc::{EXIT_SUCCESS, EXIT_FAILURE};
 use std::num;
 
 fn main() {
-    let status = if main_with_result() { EXIT_SUCCESS } else { EXIT_FAILURE };
-    env::set_exit_status(status);
+    set_exit_status!(main_with_result());
 }
 
 fn main_with_result() -> bool {
