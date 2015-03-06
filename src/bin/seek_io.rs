@@ -30,17 +30,14 @@ fn main_with_result() -> bool {
         Err(errno) => return err_exit!(errno, "open")
     };
 
-    for arg in argv.iter().skip(2) {
-        let result = match arg.char_at(0) {
+    argv.iter().skip(2).all(|arg| {
+        match arg.char_at(0) {
             'r' | 'R' => read_file(&fd, arg),
             'w' => write_file(&fd, arg),
             's' => seek_file(&fd, arg),
             _ => cmd_line_err!("Argument must start with [rRws]: {}", arg)
-        };
-        if !result { return false };
-    }
-
-    true
+        }
+    })
 }
 
 fn read_file(fd: &FileDescriptor, arg: &str) -> bool {
