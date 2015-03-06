@@ -4,6 +4,8 @@
 #[macro_use]
 extern crate tlpi_rust;
 
+extern crate core;
+
 use std::env;
 use tlpi_rust::fd::*;
 use std::num;
@@ -34,22 +36,20 @@ fn main_with_result() -> bool {
 
     argv.iter().skip(2).all(|arg| {
         match Command::parse(arg) {
-            Ok(Read { byte_count, format }) => {
-                read_file(&fd, arg, byte_count, format)
-            },
-            Ok(Write { text }) => write_file(&fd, arg, text),
-            Ok(Seek { offset }) => seek_file(&fd, arg, offset),
+            Ok(command) => command.execute(&fd),
             Err(message) => cmd_line_err!("{}", message),
         }
     })
 }
 
+#[derive(Copy)]
 enum Command<'a> {
     Read { byte_count: usize, format: ReadFormat },
     Write { text: &'a str },
     Seek { offset: i64 },
 }
 
+#[derive(Copy)]
 enum ReadFormat { Text, Hex }
 
 impl<'a> Command<'a> {
@@ -72,6 +72,59 @@ impl<'a> Command<'a> {
         }
     }
 
+    fn execute(self, fd: &FileDescriptor) -> bool {
+        match self {
+            Read { byte_count, format } => {
+                let mut buf = vec![0u8; byte_count];
+                let num_read = match fd.read(buf.as_mut_slice()) {
+                    Ok(count) => count,
+                    Err(errno) => return err_exit!(errno, "read"),
+                };
+
+                print!("{}: ", self);
+                if num_read == 0 {
+                    println!("end-of-file");
+                } else {
+                    display_bytes(&buf[..num_read], format);
+                }
+            },
+            Write { text } => {
+                let num_written = match fd.write(text.as_bytes()) {
+                    Ok(bytes) => bytes,
+                    Err(errno) => return err_exit!(errno, "write")
+                };
+                println!("{}: wrote {} bytes", self, num_written);
+            },
+            Seek { offset } => {
+                match fd.lseek(offset, OffsetBase::SeekSet) {
+                    Err(errno) => return err_exit!(errno, "lseek"),
+                    _ => {}
+                };
+
+                println!("{}: seek succeeded", self);
+            },
+        };
+        true
+    }
+
+}
+
+impl<'a> core::fmt::Display for Command<'a> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            &Read { byte_count, format } => {
+                 let command_char = match format {
+                    Text => 'r',
+                    Hex => 'R',
+                };
+                write!(f, "{}{}", command_char, byte_count)
+            },
+            &Write { text } => write!(f, "w{}", text),
+            &Seek { offset } => write!(f, "s{}", offset),
+        }
+    }
+
 }
 
 fn parse_int<T>(
@@ -79,25 +132,6 @@ fn parse_int<T>(
 ) -> Result<T, String> where T: num::FromStrRadix {
     let parsed = num::from_str_radix(s, 10);
     parsed.map_err(|_| format!("Invalid {}: {}", into_what, s))
-}
-
-fn read_file(
-    fd: &FileDescriptor, arg: &str, byte_count: usize, format: ReadFormat
-) -> bool {
-    let mut buf = vec![0u8; byte_count];
-    let num_read = match fd.read(buf.as_mut_slice()) {
-        Ok(count) => count,
-        Err(errno) => return err_exit!(errno, "read"),
-    };
-
-    print!("{}: ", arg);
-    if num_read == 0 {
-        println!("end-of-file");
-    } else {
-        display_bytes(&buf[..num_read], format);
-    }
-
-    true
 }
 
 fn display_bytes(bytes: &[u8], format: ReadFormat) {
@@ -117,23 +151,4 @@ fn display_bytes(bytes: &[u8], format: ReadFormat) {
         }
     };
     println!("");
-}
-
-fn write_file(fd: &FileDescriptor, arg: &str, text: &str) -> bool {
-    let num_written = match fd.write(text.as_bytes()) {
-        Ok(bytes) => bytes,
-        Err(errno) => return err_exit!(errno, "write")
-    };
-    println!("{}: wrote {} bytes", arg, num_written);
-    true
-}
-
-fn seek_file(fd: &FileDescriptor, arg: &str, offset: i64) -> bool {
-    match fd.lseek(offset, OffsetBase::SeekSet) {
-        Err(errno) => return err_exit!(errno, "lseek"),
-        _ => {}
-    };
-
-    println!("{}: seek succeeded", arg);
-    true
 }

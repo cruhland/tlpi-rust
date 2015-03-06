@@ -1,8 +1,7 @@
 - Soon
-  - Next example program
+  - Use proper Error types in library functions and example programs
   - Make fd::FileDescriptor a newtype and use .0 syntax
 - Later
   - Stop using old_io
-  - Use proper Error types in library functions and example programs
   - Provide script for generating the `ENAME` array in `err.rs`
   - Provide script for generating tlpi_rust::util::OpenFlags from a C header file
