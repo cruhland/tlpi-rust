@@ -7,6 +7,8 @@ extern crate tlpi_rust;
 use std::env;
 use tlpi_rust::fd::*;
 use std::num;
+use Command::*;
+use ReadFormat::*;
 
 fn main() {
     set_exit_status!(main_with_result());
@@ -31,21 +33,57 @@ fn main_with_result() -> bool {
     };
 
     argv.iter().skip(2).all(|arg| {
-        match arg.char_at(0) {
-            'r' | 'R' => read_file(&fd, arg),
-            'w' => write_file(&fd, arg),
-            's' => seek_file(&fd, arg),
-            _ => cmd_line_err!("Argument must start with [rRws]: {}", arg)
+        match Command::parse(arg) {
+            Ok(Read { byte_count, format }) => {
+                read_file(&fd, arg, byte_count, format)
+            },
+            Ok(Write { text }) => write_file(&fd, arg, text),
+            Ok(Seek { offset }) => seek_file(&fd, arg, offset),
+            Err(message) => cmd_line_err!("{}", message),
         }
     })
 }
 
-fn read_file(fd: &FileDescriptor, arg: &str) -> bool {
-    let byte_count = match num::FromStrRadix::from_str_radix(&arg[1..], 10) {
-        Ok(count) => count,
-        _ => return cmd_line_err!("Invalid length: {}", arg)
-    };
+enum Command<'a> {
+    Read { byte_count: usize, format: ReadFormat },
+    Write { text: &'a str },
+    Seek { offset: i64 },
+}
 
+enum ReadFormat { Text, Hex }
+
+impl<'a> Command<'a> {
+
+    fn parse(s: &str) -> Result<Command, String> {
+        match s.slice_shift_char() {
+            Some(('r', arg)) => {
+                parse_int(arg, "length")
+                    .map(|count| Read { byte_count: count, format: Text })
+            },
+            Some(('R', arg)) => {
+                parse_int(arg, "length")
+                    .map(|count| Read { byte_count: count, format: Hex })
+            },
+            Some(('w', arg)) => Ok(Write { text: arg }),
+            Some(('s', arg)) => {
+                parse_int(arg, "offset").map(|offset| Seek { offset: offset })
+            },
+            _ => Err(format!("Argument must start with [rRws]: {:?}", s)),
+        }
+    }
+
+}
+
+fn parse_int<T>(
+    s: &str, into_what: &str
+) -> Result<T, String> where T: num::FromStrRadix {
+    let parsed = num::from_str_radix(s, 10);
+    parsed.map_err(|_| format!("Invalid {}: {}", into_what, s))
+}
+
+fn read_file(
+    fd: &FileDescriptor, arg: &str, byte_count: usize, format: ReadFormat
+) -> bool {
     let mut buf = vec![0u8; byte_count];
     let num_read = match fd.read(buf.as_mut_slice()) {
         Ok(count) => count,
@@ -56,15 +94,15 @@ fn read_file(fd: &FileDescriptor, arg: &str) -> bool {
     if num_read == 0 {
         println!("end-of-file");
     } else {
-        display_bytes(&buf[..num_read], arg.char_at(0));
+        display_bytes(&buf[..num_read], format);
     }
 
     true
 }
 
-fn display_bytes(bytes: &[u8], format: char) {
+fn display_bytes(bytes: &[u8], format: ReadFormat) {
     match format {
-        'r' => {
+        Text => {
             // TODO Handle UTF-8 error gracefully
             let buf_str = std::str::from_utf8(bytes).unwrap();
             for c in buf_str.chars() {
@@ -72,7 +110,7 @@ fn display_bytes(bytes: &[u8], format: char) {
                 print!("{}", out_char);
             }
         },
-        _ => {
+        Hex => {
             for byte in bytes {
                 print!("{:0>2x} ", byte);
             }
@@ -81,8 +119,8 @@ fn display_bytes(bytes: &[u8], format: char) {
     println!("");
 }
 
-fn write_file(fd: &FileDescriptor, arg: &str) -> bool {
-    let num_written = match fd.write(arg[1..].as_bytes()) {
+fn write_file(fd: &FileDescriptor, arg: &str, text: &str) -> bool {
+    let num_written = match fd.write(text.as_bytes()) {
         Ok(bytes) => bytes,
         Err(errno) => return err_exit!(errno, "write")
     };
@@ -90,12 +128,7 @@ fn write_file(fd: &FileDescriptor, arg: &str) -> bool {
     true
 }
 
-fn seek_file(fd: &FileDescriptor, arg: &str) -> bool {
-    let offset = match num::FromStrRadix::from_str_radix(&arg[1..], 10) {
-        Ok(count) => count,
-        _ => return cmd_line_err!("Invalid offset: {}", arg)
-    };
-
+fn seek_file(fd: &FileDescriptor, arg: &str, offset: i64) -> bool {
     match fd.lseek(offset, OffsetBase::SeekSet) {
         Err(errno) => return err_exit!(errno, "lseek"),
         _ => {}
