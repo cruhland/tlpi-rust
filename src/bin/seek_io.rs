@@ -137,10 +137,9 @@ fn parse_int<T>(
 fn display_bytes(bytes: &[u8], format: ReadFormat) {
     match format {
         Text => {
-            // TODO Handle UTF-8 error gracefully
-            let buf_str = std::str::from_utf8(bytes).unwrap();
+            let buf_str = std::string::String::from_utf8_lossy(bytes);
             for c in buf_str.chars() {
-                let out_char = if c.is_control() { '?' } else { c };
+                let out_char = if c.is_control() { '\u{FFFD}' } else { c };
                 print!("{}", out_char);
             }
         },
