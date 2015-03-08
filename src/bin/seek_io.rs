@@ -8,6 +8,7 @@ extern crate core;
 
 use std::env;
 use tlpi_rust::fd::*;
+use tlpi_rust::err::*;
 use std::num;
 use Command::*;
 use ReadFormat::*;
@@ -16,7 +17,7 @@ fn main() {
     set_exit_status!(main_with_result());
 }
 
-fn main_with_result() -> bool {
+fn main_with_result() -> TlpiResult {
     let argv: Vec<_> = env::args().collect();
 
     if argv.len() < 3 || argv[1] == "--help" {
@@ -34,12 +35,15 @@ fn main_with_result() -> bool {
         Err(errno) => return err_exit!(errno, "open")
     };
 
-    argv.iter().skip(2).all(|arg| {
-        match Command::parse(arg) {
+    for arg in argv.iter().skip(2) {
+        let result = match Command::parse(arg) {
             Ok(command) => command.execute(&fd),
             Err(message) => cmd_line_err!("{}", message),
-        }
-    })
+        };
+        if result.is_err() { return result; }
+    }
+
+    Ok(())
 }
 
 #[derive(Copy)]
@@ -72,7 +76,7 @@ impl<'a> Command<'a> {
         }
     }
 
-    fn execute(self, fd: &FileDescriptor) -> bool {
+    fn execute(self, fd: &FileDescriptor) -> TlpiResult {
         match self {
             Read { byte_count, format } => {
                 let mut buf = vec![0u8; byte_count];
@@ -104,7 +108,7 @@ impl<'a> Command<'a> {
                 println!("{}: seek succeeded", self);
             },
         };
-        true
+        Ok(())
     }
 
 }

@@ -22,11 +22,17 @@ impl Errno {
 
 }
 
+/// Result type that only indicates success or failure.
+///
+/// It's preferable to `bool` because the compiler will warn if values
+/// of `Result` type are not used.
+pub type TlpiResult = Result<(), ()>;
+
 /// Reports command-line argument usage errors.
 ///
 /// Expects a format string and arguments, like `println!`. The prefix
 /// `"Usage: "` will be added to the format string before display on
-/// standard error. Returns `false` to indicate program failure.
+/// standard error. Returns an indication of program failure.
 #[macro_export]
 macro_rules! usage_err {
     ($($arg:tt)*) => (
@@ -47,7 +53,7 @@ macro_rules! usage_err {
 /// - its system-provided short description;
 /// - its detail message, if provided.
 ///
-/// Returns `false` to indicate program failure.
+/// Returns an indication of program failure.
 #[macro_export]
 macro_rules! err_exit {
     ($errno:expr, $($arg:tt)*) => (
@@ -60,7 +66,7 @@ macro_rules! err_exit {
 ///
 /// Expects a format string and arguments, like `println!`. The prefix
 /// `"ERROR: "` will be added to the format string before display on
-/// standard error. Returns `false` to indicate program failure.
+/// standard error. Returns an indication of program failure.
 #[macro_export]
 macro_rules! fatal {
     ($($arg:tt)*) => (
@@ -74,8 +80,8 @@ macro_rules! fatal {
 ///
 /// Expects a format string and arguments, like `println!`. The prefix
 /// `"Command-line usage error: "` will be added to the format string
-/// before display on standard error. Returns `false` to indicate
-/// program failure.
+/// before display on standard error. Returns an indication of program
+/// failure.
 #[macro_export]
 macro_rules! cmd_line_err {
     ($($arg:tt)*) => (
@@ -85,14 +91,15 @@ macro_rules! cmd_line_err {
 
 /// Sets the exit status of the program from an expression.
 ///
-/// The expression must be of type `bool`: `true` indicates success;
-/// `false` indicates failure.
+/// The expression must be of type `Result`: `Ok` indicates success;
+/// `Err` indicates failure.
 #[macro_export]
 macro_rules! set_exit_status {
     ($result:expr) => (
         {
             use ::tlpi_rust::err::{EXIT_SUCCESS, EXIT_FAILURE};
-            let status = if $result { EXIT_SUCCESS } else { EXIT_FAILURE };
+            let status =
+                if $result.is_ok() { EXIT_SUCCESS } else { EXIT_FAILURE };
             env::set_exit_status(status);
         }
     )
@@ -113,7 +120,7 @@ macro_rules! write_err {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn usage_err_fmt(fmt: fmt::Arguments) -> bool {
+pub fn usage_err_fmt(fmt: fmt::Arguments) -> TlpiResult {
     write_err!(fmt, "Usage: ")
 }
 
@@ -122,7 +129,7 @@ pub fn usage_err_fmt(fmt: fmt::Arguments) -> bool {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> bool {
+pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> TlpiResult {
     let Errno(err) = errno;
     let err_in_bounds = err > 0 && (err as usize) < ENAME.len();
     let error_name =
@@ -144,7 +151,7 @@ pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> bool {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn fatal_fmt(fmt: fmt::Arguments) -> bool {
+pub fn fatal_fmt(fmt: fmt::Arguments) -> TlpiResult {
     write_err!(fmt, "ERROR: ")
 }
 
@@ -153,7 +160,7 @@ pub fn fatal_fmt(fmt: fmt::Arguments) -> bool {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn cmd_line_err_fmt(fmt: fmt::Arguments) -> bool {
+pub fn cmd_line_err_fmt(fmt: fmt::Arguments) -> TlpiResult {
     write_err!(fmt, "Command-line usage error: ")
 }
 
@@ -164,7 +171,7 @@ pub fn cmd_line_err_fmt(fmt: fmt::Arguments) -> bool {
 /// for other purposes.
 fn write_err_fmt(
     prefix_fmt: fmt::Arguments, message_fmt: fmt::Arguments
-) -> bool {
+) -> TlpiResult {
     io::stdio::stdout().flush().unwrap();
 
     let mut stderr = io::stdio::stderr();
@@ -172,7 +179,8 @@ fn write_err_fmt(
     stderr.write_fmt(message_fmt).unwrap();
     stderr.write_char('\n').unwrap();
     stderr.flush().unwrap();
-    false
+
+    Err(())
 }
 
 /// Names for the various documented `errno` values, as defined on an
