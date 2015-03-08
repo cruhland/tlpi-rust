@@ -22,11 +22,11 @@ impl Errno {
 
 }
 
-/// Result type that only indicates success or failure.
+/// Result type that has trivial error information.
 ///
-/// It's preferable to `bool` because the compiler will warn if values
-/// of `Result` type are not used.
-pub type TlpiResult = Result<(), ()>;
+/// It's preferable to `Option` because the compiler will warn if
+/// values of `Result` type are not used.
+pub type TlpiResult<T> = Result<T, ()>;
 
 /// Reports command-line argument usage errors.
 ///
@@ -120,7 +120,7 @@ macro_rules! write_err {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn usage_err_fmt(fmt: fmt::Arguments) -> TlpiResult {
+pub fn usage_err_fmt<T>(fmt: fmt::Arguments) -> TlpiResult<T> {
     write_err!(fmt, "Usage: ")
 }
 
@@ -129,7 +129,7 @@ pub fn usage_err_fmt(fmt: fmt::Arguments) -> TlpiResult {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> TlpiResult {
+pub fn err_exit_fmt<T>(errno: Errno, fmt: fmt::Arguments) -> TlpiResult<T> {
     let Errno(err) = errno;
     let err_in_bounds = err > 0 && (err as usize) < ENAME.len();
     let error_name =
@@ -151,7 +151,7 @@ pub fn err_exit_fmt(errno: Errno, fmt: fmt::Arguments) -> TlpiResult {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn fatal_fmt(fmt: fmt::Arguments) -> TlpiResult {
+pub fn fatal_fmt<T>(fmt: fmt::Arguments) -> TlpiResult<T> {
     write_err!(fmt, "ERROR: ")
 }
 
@@ -160,7 +160,7 @@ pub fn fatal_fmt(fmt: fmt::Arguments) -> TlpiResult {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-pub fn cmd_line_err_fmt(fmt: fmt::Arguments) -> TlpiResult {
+pub fn cmd_line_err_fmt<T>(fmt: fmt::Arguments) -> TlpiResult<T> {
     write_err!(fmt, "Command-line usage error: ")
 }
 
@@ -169,9 +169,9 @@ pub fn cmd_line_err_fmt(fmt: fmt::Arguments) -> TlpiResult {
 ///
 /// This is mainly an implementation detail, but it might be useful
 /// for other purposes.
-fn write_err_fmt(
+fn write_err_fmt<T>(
     prefix_fmt: fmt::Arguments, message_fmt: fmt::Arguments
-) -> TlpiResult {
+) -> TlpiResult<T> {
     io::stdio::stdout().flush().unwrap();
 
     let mut stderr = io::stdio::stderr();

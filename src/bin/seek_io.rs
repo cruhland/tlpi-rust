@@ -17,7 +17,7 @@ fn main() {
     set_exit_status!(main_with_result());
 }
 
-fn main_with_result() -> TlpiResult {
+fn main_with_result() -> TlpiResult<()> {
     let argv: Vec<_> = env::args().collect();
 
     if argv.len() < 3 || argv[1] == "--help" {
@@ -35,15 +35,11 @@ fn main_with_result() -> TlpiResult {
         Err(errno) => return err_exit!(errno, "open")
     };
 
-    for arg in argv.iter().skip(2) {
-        let result = match Command::parse(arg) {
-            Ok(command) => command.execute(&fd),
-            Err(message) => cmd_line_err!("{}", message),
-        };
-        if result.is_err() { return result; }
-    }
+    let result_iter = argv.iter().skip(2).map(|arg| {
+        Command::parse(arg).and_then(|command| command.execute(&fd))
+    });
 
-    Ok(())
+    std::result::fold(result_iter, (), |v, _| v)
 }
 
 #[derive(Copy)]
@@ -58,7 +54,7 @@ enum ReadFormat { Text, Hex }
 
 impl<'a> Command<'a> {
 
-    fn parse(s: &str) -> Result<Command, String> {
+    fn parse(s: &str) -> TlpiResult<Command> {
         match s.slice_shift_char() {
             Some(('r', arg)) => {
                 parse_int(arg, "length")
@@ -72,11 +68,11 @@ impl<'a> Command<'a> {
             Some(('s', arg)) => {
                 parse_int(arg, "offset").map(|offset| Seek { offset: offset })
             },
-            _ => Err(format!("Argument must start with [rRws]: {:?}", s)),
+            _ => cmd_line_err!("Argument must start with [rRws]: {:?}", s),
         }
     }
 
-    fn execute(self, fd: &FileDescriptor) -> TlpiResult {
+    fn execute(self, fd: &FileDescriptor) -> TlpiResult<()> {
         match self {
             Read { byte_count, format } => {
                 let mut buf = vec![0u8; byte_count];
@@ -133,9 +129,9 @@ impl<'a> core::fmt::Display for Command<'a> {
 
 fn parse_int<T>(
     s: &str, into_what: &str
-) -> Result<T, String> where T: num::FromStrRadix {
+) -> TlpiResult<T> where T: num::FromStrRadix {
     let parsed = num::from_str_radix(s, 10);
-    parsed.map_err(|_| format!("Invalid {}: {}", into_what, s))
+    parsed.or_else(|_| cmd_line_err!("Invalid {}: {}", into_what, s))
 }
 
 fn display_bytes(bytes: &[u8], format: ReadFormat) {

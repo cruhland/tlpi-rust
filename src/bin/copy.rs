@@ -13,7 +13,7 @@ fn main() {
     set_exit_status!(main_with_io());
 }
 
-fn main_with_io() -> tlpi_rust::err::TlpiResult {
+fn main_with_io() -> tlpi_rust::err::TlpiResult<()> {
     let argv: Vec<_> = env::args().collect();
 
     if argv.len() != 3 || argv[1] == "--help" {
