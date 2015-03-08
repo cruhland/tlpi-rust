@@ -1,5 +1,5 @@
 
-#![feature(collections, core, env, libc)]
+#![feature(collections, core, exit_status, libc)]
 
 #[macro_use]
 extern crate tlpi_rust;
