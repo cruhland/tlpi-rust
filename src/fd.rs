@@ -15,9 +15,7 @@ pub type SysResult<T> = Result<T, Errno>;
 /// Does not implement `Copy` so that `FileDescriptor::close()` can
 /// take ownership, preventing file descriptors from being used
 /// afterwards.
-pub struct FileDescriptor {
-    raw: c_int,
-}
+pub struct FileDescriptor(c_int);
 
 /// Factors out the common operation of creating a `SysResult` based
 /// on a syscall return value and `errno`.
@@ -53,7 +51,7 @@ impl FileDescriptor {
         // Panic if `path` contains nul chars; crude but good enough
         let cstring_path = ffi::CString::new(path).unwrap().as_ptr();
         let fd = unsafe { open(cstring_path, flags.bits(), mode.bits()) };
-        errno_check!(fd, FileDescriptor { raw: fd, })
+        errno_check!(fd, FileDescriptor(fd))
     }
 
     /// The `read()` system call.
@@ -66,7 +64,7 @@ impl FileDescriptor {
     pub fn read(&self, buf: &mut [u8]) -> SysResult<usize> {
         let buf_ptr = buf.as_mut_ptr() as *mut c_void;
         let buf_len = buf.len() as size_t;
-        let bytes_read = unsafe { read(self.raw, buf_ptr, buf_len) };
+        let bytes_read = unsafe { read(self.0, buf_ptr, buf_len) };
         errno_check!(bytes_read, bytes_read as usize)
     }
 
@@ -81,7 +79,7 @@ impl FileDescriptor {
     pub fn write(&self, buf: &[u8]) -> SysResult<usize> {
         let buf_ptr = buf.as_ptr() as *const c_void;
         let buf_len = buf.len() as size_t;
-        let bytes_written = unsafe { write(self.raw, buf_ptr, buf_len) };
+        let bytes_written = unsafe { write(self.0, buf_ptr, buf_len) };
         errno_check!(bytes_written, bytes_written as usize)
     }
 
@@ -99,20 +97,21 @@ impl FileDescriptor {
     /// Consult the man page (command `man 2 close`) for further
     /// details.
     pub fn close(self) -> SysResult<()> {
-        let status = unsafe { close(self.raw) };
+        let status = unsafe { close(self.0) };
         errno_check!(status, ())
     }
 
     /// The `lseek()` system call.
     ///
     /// Adjusts the offset of the file to the value of `offset` under
-    /// the interpretation of `whence`.
+    /// the interpretation of `whence`, returning the resulting
+    /// absolute offset.
     ///
     /// Consult the man page (command `man 2 lseek`) for further
     /// details.
     pub fn lseek(&self, offset: i64, whence: OffsetBase) -> SysResult<u64> {
         let abs_offset = unsafe {
-            lseek(self.raw, offset as off_t, whence as i32)
+            lseek(self.0, offset as off_t, whence as i32)
         };
         errno_check!(abs_offset, abs_offset as u64)
     }
