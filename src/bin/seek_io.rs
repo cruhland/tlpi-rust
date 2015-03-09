@@ -35,11 +35,20 @@ fn main_with_result() -> TlpiResult<()> {
         Err(errno) => return err_exit!(errno, "open")
     };
 
-    let result_iter = argv.iter().skip(2).map(|arg| {
-        Command::parse(arg).and_then(|command| command.execute(&fd))
-    });
+    let result = {
+        // Need to put this in a block so that `fd` is not borrowed
+        // for the call to `close()` below
+        let result_iter = argv.iter().skip(2).map(|arg| {
+            Command::parse(arg).and_then(|command| command.execute(&fd))
+        });
 
-    std::result::fold(result_iter, (), |v, _| v)
+        std::result::fold(result_iter, (), |v, _| v)
+    };
+
+    match fd.close() {
+        Err(errno) => err_exit!(errno, "close"),
+        _ => result,
+    }
 }
 
 #[derive(Copy)]
