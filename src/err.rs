@@ -100,7 +100,7 @@ macro_rules! set_exit_status {
             use ::tlpi_rust::err::{EXIT_SUCCESS, EXIT_FAILURE};
             let status =
                 if $result.is_ok() { EXIT_SUCCESS } else { EXIT_FAILURE };
-            env::set_exit_status(status);
+            std::env::set_exit_status(status);
         }
     )
 }
