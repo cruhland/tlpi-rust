@@ -8,6 +8,7 @@ extern crate getopts;
 use getopts::Options;
 
 use tlpi_rust::err::*;
+use tlpi_rust::fd::*;
 use std::env;
 
 fn main() {
@@ -15,20 +16,27 @@ fn main() {
 }
 
 fn main_with_result() -> TlpiResult<()> {
-    let output_path = try!(parse_args());
+    let (output_path, write_mode) = try!(parse_args());
 
-    // Open destination file (truncate or append)
+    let path = output_path.clone();
+    let flags = O_WRONLY | O_CREAT | write_mode;
+    let perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // rw-r--r--
+    let dest_fd = match FileDescriptor::open(path, flags, perms) {
+        Ok(fd) => fd,
+        Err(errno) => return err_exit!(errno, "open() on file {}", output_path),
+    };
+
     // Until EOF on stdin:
     //   Read a chunk of bytes from stdin
     //   Write that chunk to stdout
     //   Write that chunk to destination file
-    // Close destination file
 
-    println!("Output path: {:?}", output_path);
-    Err(())
+    dest_fd.close().or_else(|errno| {
+        err_exit!(errno, "close() on file {}", output_path)
+    })
 }
 
-fn parse_args() -> TlpiResult<String> {
+fn parse_args() -> TlpiResult<(String, OpenFlags)> {
     let argv: Vec<_> = env::args().collect();
     let opts = build_options();
 
@@ -47,7 +55,9 @@ fn parse_args() -> TlpiResult<String> {
     }
 
     if matches.free.len() == 1 {
-        Ok(matches.free.swap_remove(0))
+        let write_mode =
+            if matches.opt_present("append") { O_APPEND } else { O_TRUNC };
+        Ok((matches.free.swap_remove(0), write_mode))
     } else {
         let usage = opts.usage("Exactly one file argument is required");
         return cmd_line_err!("{}", usage)
