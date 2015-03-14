@@ -5,6 +5,7 @@ use std::ffi;
 use std::os;
 use libc::{open, read, write, close, lseek};
 use libc::{c_int, size_t, mode_t, c_void, off_t};
+use libc::{STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
 use err::Errno;
 
 /// The result of a system call.
@@ -16,6 +17,15 @@ pub type SysResult<T> = Result<T, Errno>;
 /// take ownership, preventing file descriptors from being used
 /// afterwards.
 pub struct FileDescriptor(c_int);
+
+/// File descritor for standard input
+pub const STDIN: FileDescriptor = FileDescriptor(STDIN_FILENO);
+
+/// File descriptor for standard output
+pub const STDOUT: FileDescriptor = FileDescriptor(STDOUT_FILENO);
+
+/// File descriptor for standard error
+pub const STDERR: FileDescriptor = FileDescriptor(STDERR_FILENO);
 
 /// Factors out the common operation of creating a `SysResult` based
 /// on a syscall return value and `errno`.
