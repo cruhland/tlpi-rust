@@ -21,3 +21,7 @@ name = "seek_io"
 [[bin]]
 
 name = "tee"
+
+[[bin]]
+
+name = "copy_holes"

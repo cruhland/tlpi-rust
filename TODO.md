@@ -1,5 +1,4 @@
 - Soon
-  - Exercise 4-1, the `tee` command
   - Exercise 4-2, copy file with holes
 - Later
   - Stop using old_io
