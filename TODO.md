@@ -1,6 +1,8 @@
 - Soon
   - Exercise 4-2, copy file with holes
 - Later
-  - Stop using old_io
+  - Get rid of deprecation warnings for std::os::errno()
+    - Either get direct access to the errno value,
+    - or determine the UNIX error name from std::io::Error
   - Provide script for generating the `ENAME` array in `err.rs`
   - Provide script for generating tlpi_rust::util::OpenFlags from a C header file

@@ -3,8 +3,10 @@
 
 extern crate libc;
 
-use std::old_io as io;
+use std::error;
 use std::fmt;
+use std::io;
+use std::io::Write;
 
 // libc provides no doc comments for these; it's clearer
 // if they are just mentioned as reexports in the docs
@@ -134,15 +136,12 @@ pub fn err_exit_fmt<T>(errno: Errno, fmt: fmt::Arguments) -> TlpiResult<T> {
     let err_in_bounds = err > 0 && (err as usize) < ENAME.len();
     let error_name =
         if err_in_bounds { ENAME[err as usize] } else { "?UNKNOWN?" };
-    let io_error = io::IoError::from_errno(err, true);
-    let detail = match io_error.detail {
-        Some(ref d) => format!(" ({})", d),
-        _ => String::new()
-    };
+    let io_error = io::Error::from_os_error(err);
+    let detail = format!(" ({})", io_error.to_string());
 
     write_err!(
-        fmt, "ERROR [{} ({:?}); {}{}] ", error_name, io_error.kind,
-        io_error.desc, detail
+        fmt, "ERROR [{} ({:?}); {}{}] ", error_name, io_error.kind(),
+        error::Error::description(&io_error), detail
     )
 }
 
@@ -172,12 +171,12 @@ pub fn cmd_line_err_fmt<T>(fmt: fmt::Arguments) -> TlpiResult<T> {
 fn write_err_fmt<T>(
     prefix_fmt: fmt::Arguments, message_fmt: fmt::Arguments
 ) -> TlpiResult<T> {
-    io::stdio::stdout().flush().unwrap();
+    io::stdout().flush().unwrap();
 
-    let mut stderr = io::stdio::stderr();
+    let mut stderr = io::stderr();
     stderr.write_fmt(prefix_fmt).unwrap();
     stderr.write_fmt(message_fmt).unwrap();
-    stderr.write_char('\n').unwrap();
+    stderr.write("\n".as_bytes()).unwrap();
     stderr.flush().unwrap();
 
     Err(())
