@@ -69,24 +69,56 @@ fn main_with_io() -> TlpiResult<()> {
 fn write_with_holes(
     fd: &FileDescriptor, buf: &[u8], desc: &str
 ) -> TlpiResult<()> {
-    //let mut iter = buf.iter();
-    // Search for the first non-zero byte with position()
-    // Store that index
-    // If it's > 0, lseek() to the index
-    //loop {
-        // Search for the first zero byte from current index
-        // Write slice in between
-        // Save new index
+    let mut iter = buf.iter();
+    let len = buf.len();
+    let mut region_start = try!(seek_to_data(fd, desc, &mut iter, len));
 
-        // Search for the first non-zero byte from current index
-        // lseek() to that position
-        // Save new index
-        match fd.write(buf) {
-            Ok(bytes_written) if buf.len() == bytes_written => {},
-            Ok(_) => return fatal!("couldn't write whole buffer"),
-            Err(errno) => return err_exit!(errno, "writing file {}", desc)
+    while region_start < len {
+        let region_end = match iter.position(|&byte| byte == 0) {
+            Some(pos) => region_start + pos + 1,
+            _ => buf.len(),
         };
-    //}
+        println!("region_start = {:?}", region_start);
+        println!("region_end = {:?}", region_end);
+        let slice = &buf[region_start..region_end];
+        println!("About to write slice with len {:?}", slice.len());
+        match fd.write(slice) {
+            Ok(byte_count) if slice.len() == byte_count => {},
+            Ok(_) => return fatal!(
+                "couldn't write entire region [{}..{}] of file {}",
+                region_start,
+                region_end,
+                desc
+            ),
+            Err(errno) => return err_exit!(
+                errno,
+                "writing region [{}..{}] of file {}",
+                region_start,
+                region_end,
+                desc
+            ),
+        };
+        if region_end >= len { break };
+        region_start =
+            region_end + try!(seek_to_data(fd, desc, &mut iter, len - region_end));
+        println!("region_start at end of loop: {:?}", region_start);
+    }
 
     Ok(())
+}
+
+fn seek_to_data<'a>(
+    fd: &FileDescriptor,
+    desc: &str,
+    iter: &mut std::slice::Iter<'a, u8>,
+    max_amount: usize,
+) -> TlpiResult<usize> {
+    let seek_amount = iter.position(|&byte| byte != 0).unwrap_or(max_amount);
+    println!("seek_amount = {:?}", seek_amount);
+    match fd.lseek(seek_amount as i64, OffsetBase::SeekCur) {
+        Err(errno) => return err_exit!(
+            errno, "lseek by amount {} in file {}", seek_amount, desc
+        ),
+        _ => Ok(seek_amount),
+    }
 }
