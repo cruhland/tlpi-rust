@@ -1,5 +1,5 @@
 
-#![feature(libc, exit_status)]
+#![feature(libc, exit_status, collections)]
 
 #[macro_use]
 extern crate tlpi_rust;
@@ -7,6 +7,7 @@ extern crate tlpi_rust;
 use std::env;
 use tlpi_rust::fd::*;
 use tlpi_rust::err::*;
+use Region::*;
 
 const BUF_SIZE: usize = 1 << 16; // 64k
 
@@ -21,122 +22,203 @@ fn main_with_io() -> TlpiResult<()> {
         return usage_err!("{} old-file new-file", argv[0]);
     }
 
-    // Open input and output files
+    let input_fd = try!(open_input(&argv[1][..]));
+    let output_fd = try!(open_output(&argv[2][..]));
 
-    let src_path = argv[1].clone();
-    let empty_perms = FilePerms::empty();
-    let input_fd = match FileDescriptor::open(src_path, O_RDONLY, empty_perms) {
-        Ok(fd) => fd,
-        Err(errno) => return err_exit!(errno, "opening file {}", argv[1])
-    };
+    try!(copy_with_holes(&input_fd, &output_fd));
 
-    let open_flags = O_CREAT | O_WRONLY | O_TRUNC;
-    let file_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    let dst_path = argv[2].clone();
-    let output_fd = match FileDescriptor::open(dst_path, open_flags, file_perms) {
-        Ok(fd) => fd,
-        Err(errno) => return err_exit!(errno, "opening file {}", argv[2])
-    };
-
-    // Transfer data until we encounter end of input or an error
-
-    let mut buf = [0u8; BUF_SIZE];
-    let mut length = 0;
-    let mut ends_with_hole = false;
-
-    loop {
-        let bytes_read = match input_fd.read(&mut buf[..]) {
-            Ok(0) => break,
-            Ok(bytes) => bytes,
-            Err(errno) => return err_exit!(errno, "reading file {}", argv[1])
-        };
-        length += bytes_read;
-
-        let write_buf = &buf[..bytes_read];
-        let desc = &argv[2][..];
-        ends_with_hole = try!(write_with_holes(&output_fd, write_buf, desc));
-    }
-
-    if ends_with_hole {
-        match output_fd.ftruncate(length as i64) {
-            Err(errno) => return err_exit!(errno, "extending file {}", argv[2]),
-            _ => {},
-        }
-    }
-
-    // Clean up
-
-    match input_fd.close() {
-        Err(errno) => return err_exit!(errno, "close input"),
-        _ => {}
-    };
-
-    match output_fd.close() {
-        Err(errno) => return err_exit!(errno, "close output"),
-        _ => {}
-    };
+    try!(clean_up(input_fd, "input"));
+    try!(clean_up(output_fd, "output"));
 
     Ok(())
 }
 
-fn write_with_holes(
-    fd: &FileDescriptor, buf: &[u8], desc: &str
-) -> TlpiResult<bool> {
-    let mut iter = buf.iter();
-    let len = buf.len();
-    let mut region_start = try!(seek_to_data(fd, desc, &mut iter, len));
-    let mut ends_with_hole = region_start == len;
-
-    while region_start < len {
-        let region_end = match iter.position(|&byte| byte == 0) {
-            Some(pos) => region_start + pos + 1,
-            _ => buf.len(),
-        };
-        println!("region_start = {:?}", region_start);
-        println!("region_end = {:?}", region_end);
-        let slice = &buf[region_start..region_end];
-        println!("About to write slice with len {:?}", slice.len());
-        match fd.write(slice) {
-            Ok(byte_count) if slice.len() == byte_count => {},
-            Ok(_) => return fatal!(
-                "couldn't write entire region [{}..{}] of file {}",
-                region_start,
-                region_end,
-                desc
-            ),
-            Err(errno) => return err_exit!(
-                errno,
-                "writing region [{}..{}] of file {}",
-                region_start,
-                region_end,
-                desc
-            ),
-        };
-        ends_with_hole = false;
-        if region_end >= len { break };
-        let remaining_len = len - region_end;
-        region_start =
-            region_end + try!(seek_to_data(fd, desc, &mut iter, remaining_len));
-        ends_with_hole = region_start == remaining_len;
-        println!("region_start at end of loop: {:?}", region_start);
-        println!("remaining_len at end of loop: {:?}", remaining_len);
-    }
-
-    Ok(ends_with_hole)
+fn open_input(path: &str) -> TlpiResult<FileDescriptor> {
+    let empty_perms = FilePerms::empty();
+    FileDescriptor::open(String::from_str(path), O_RDONLY, empty_perms)
+        .or_else(|errno| err_exit!(errno, "opening input file {}", path))
 }
 
-fn seek_to_data<'a>(
-    fd: &FileDescriptor,
-    desc: &str,
-    iter: &mut std::slice::Iter<'a, u8>,
-    max_amount: usize,
-) -> TlpiResult<usize> {
-    let seek_amount = iter.position(|&byte| byte != 0).unwrap_or(max_amount);
-    println!("seek_amount = {:?}", seek_amount);
-    match fd.lseek(seek_amount as i64, OffsetBase::SeekCur) {
-        Err(errno) => return err_exit!(
-            errno, "lseek by amount {} in file {}", seek_amount, desc
-        ),
-        _ => Ok(seek_amount),
+fn open_output(path: &str) -> TlpiResult<FileDescriptor> {
+    let open_flags = O_CREAT | O_WRONLY | O_TRUNC;
+    let file_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    FileDescriptor::open(String::from_str(path), open_flags, file_perms)
+        .or_else(|errno| err_exit!(errno, "opening output file {}", path))
+}
+
+fn copy_with_holes(
+    input_fd: &FileDescriptor, output_fd: &FileDescriptor
+) -> TlpiResult<()> {
+    let mut reader = RegionReader::attach(input_fd);
+    let mut writer = BulkWriter::attach(output_fd);
+
+    loop {
+        let region = match try!(reader.read()) {
+            Some(r) => r,
+            _ => break,
+        };
+
+        match region {
+            Data(data) => try!(writer.write(data)),
+            Hole(size) => writer.extend(size as u64),
+        };
     }
+
+    try!(writer.detach());
+
+    Ok(())
+}
+
+enum Region<'a> {
+    Data(&'a [u8]),
+    Hole(usize),
+}
+
+struct RegionReader<'a> {
+    fd: &'a FileDescriptor,
+    buffer: [u8; BUF_SIZE],
+    next_index: usize,
+    bytes_read: usize,
+}
+
+impl<'a> RegionReader<'a> {
+
+    fn attach(fd: &FileDescriptor) -> RegionReader {
+        RegionReader {
+            fd: fd, buffer: [0; BUF_SIZE], next_index: 0, bytes_read: 0
+        }
+    }
+
+    fn read(&mut self) -> TlpiResult<Option<Region>> {
+        if self.next_index == self.bytes_read {
+            self.bytes_read = match self.fd.read(&mut self.buffer[..]) {
+                Ok(0) => return Ok(None),
+                Ok(bytes) => bytes,
+                Err(errno) => return err_exit!(errno, "reading input file"),
+            };
+            self.next_index = 0;
+        }
+
+        let current_region_start = self.next_index;
+        let region = if self.buffer[current_region_start] == 0 {
+            self.next_index = self.next_region(|&byte| byte != 0);
+            Hole(self.next_index - current_region_start)
+        } else {
+            self.next_index = self.next_region(|&byte| byte == 0);
+            Data(&self.buffer[current_region_start..self.next_index])
+        };
+
+        Ok(Some(region))
+    }
+
+    fn next_region<P>(&self, predicate: P) -> usize
+        where P: FnMut(&u8) -> bool
+    {
+        let mut iter = self.buffer[self.next_index..self.bytes_read].iter();
+        match iter.position(predicate) {
+            Some(pos) => self.next_index + pos,
+            _ => self.bytes_read,
+        }
+    }
+
+}
+
+struct BulkWriter<'a> {
+    fd: &'a FileDescriptor,
+    buffer: Vec<u8>,
+    pending_extend: u64,
+    bytes_added: u64,
+}
+
+impl<'a> BulkWriter<'a> {
+
+    fn attach(fd: &FileDescriptor) -> BulkWriter {
+        BulkWriter {
+            fd: fd,
+            buffer: Vec::with_capacity(BUF_SIZE),
+            pending_extend: 0,
+            bytes_added: 0,
+        }
+    }
+
+    fn write(&mut self, data: &[u8]) -> TlpiResult<()> {
+        if self.pending_extend > 0 && data.len() > 0 {
+            if self.buffer.len() > 0 {
+                try!(self.flush_writes());
+            }
+
+            try!(self.flush_extends());
+        }
+
+        let mut bytes_buffered = 0;
+        while bytes_buffered < data.len() {
+            if self.remaining() == 0 {
+                try!(self.flush_writes());
+            }
+
+            let capacity_index = bytes_buffered + self.buffer.capacity();
+            let end = std::cmp::min(capacity_index, data.len());
+            let slice = &data[bytes_buffered..end];
+            self.buffer.push_all(slice);
+            bytes_buffered += slice.len();
+        }
+
+        Ok(())
+    }
+
+    fn extend(&mut self, amount: u64) {
+        self.pending_extend += amount;
+    }
+
+    fn detach(mut self) -> TlpiResult<()> {
+        if self.buffer.len() > 0 {
+            try!(self.flush_writes());
+        }
+
+        if self.pending_extend > 0 {
+            let file_length = self.bytes_added + self.pending_extend;
+            let result = self.fd.ftruncate(file_length as i64);
+            try!(result.or_else(|errno| err_exit!(errno, "ftruncate")));
+        }
+
+        Ok(())
+    }
+
+    fn remaining(&self) -> usize {
+        self.buffer.capacity() - self.buffer.len()
+    }
+
+    fn flush_writes(&mut self) -> TlpiResult<()> {
+        match self.fd.write(&self.buffer[..]) {
+            Ok(byte_count) => {
+                self.bytes_added += byte_count as u64;
+                if self.buffer.len() != byte_count {
+                    return fatal!("wrote partial data");
+                }
+            },
+            Err(errno) => return err_exit!(errno, "write failure"),
+        };
+
+        self.buffer.clear();
+        Ok(())
+    }
+
+    fn flush_extends(&mut self) -> TlpiResult<()> {
+        match self.fd.lseek(self.pending_extend as i64, OffsetBase::SeekCur) {
+            Err(errno) => return err_exit!(
+                errno,
+                "lseek by amount {} in output file",
+                self.pending_extend,
+            ),
+            _ => self.bytes_added += self.pending_extend,
+        };
+
+        self.pending_extend = 0;
+        Ok(())
+    }
+
+}
+
+fn clean_up(fd: FileDescriptor, desc: &str) -> TlpiResult<()> {
+    fd.close().or_else(|errno| err_exit!(errno, "close {}", desc))
 }
