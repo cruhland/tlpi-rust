@@ -41,14 +41,27 @@ fn main_with_io() -> TlpiResult<()> {
     // Transfer data until we encounter end of input or an error
 
     let mut buf = [0u8; BUF_SIZE];
+    let mut length = 0;
+    let mut ends_with_hole = false;
+
     loop {
         let bytes_read = match input_fd.read(buf.as_mut_slice()) {
             Ok(0) => break,
             Ok(bytes) => bytes,
             Err(errno) => return err_exit!(errno, "reading file {}", argv[1])
         };
+        length += bytes_read;
 
-        try!(write_with_holes(&output_fd, &buf[..bytes_read], &argv[2][..]));
+        let write_buf = &buf[..bytes_read];
+        let desc = &argv[2][..];
+        ends_with_hole = try!(write_with_holes(&output_fd, write_buf, desc));
+    }
+
+    if ends_with_hole {
+        match output_fd.ftruncate(length as i64) {
+            Err(errno) => return err_exit!(errno, "extending file {}", argv[2]),
+            _ => {},
+        }
     }
 
     // Clean up
@@ -68,10 +81,11 @@ fn main_with_io() -> TlpiResult<()> {
 
 fn write_with_holes(
     fd: &FileDescriptor, buf: &[u8], desc: &str
-) -> TlpiResult<()> {
+) -> TlpiResult<bool> {
     let mut iter = buf.iter();
     let len = buf.len();
     let mut region_start = try!(seek_to_data(fd, desc, &mut iter, len));
+    let mut ends_with_hole = region_start == len;
 
     while region_start < len {
         let region_end = match iter.position(|&byte| byte == 0) {
@@ -98,13 +112,17 @@ fn write_with_holes(
                 desc
             ),
         };
+        ends_with_hole = false;
         if region_end >= len { break };
+        let remaining_len = len - region_end;
         region_start =
-            region_end + try!(seek_to_data(fd, desc, &mut iter, len - region_end));
+            region_end + try!(seek_to_data(fd, desc, &mut iter, remaining_len));
+        ends_with_hole = region_start == remaining_len;
         println!("region_start at end of loop: {:?}", region_start);
+        println!("remaining_len at end of loop: {:?}", remaining_len);
     }
 
-    Ok(())
+    Ok(ends_with_hole)
 }
 
 fn seek_to_data<'a>(

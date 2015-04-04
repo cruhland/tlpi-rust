@@ -1,6 +1,5 @@
 - Soon
   - Exercise 4-2, copy file with holes
-    - Extend file if there are zero bytes at the end
     - Simplify code, get rid of println! calls
     - Allow implementation to use new SEEK_DATA, SEEK_HOLE params
 - Later

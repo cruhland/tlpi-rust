@@ -3,7 +3,7 @@
 
 use std::ffi;
 use std::os;
-use libc::{open, read, write, close, lseek};
+use libc::{open, read, write, close, lseek, ftruncate};
 use libc::{c_int, size_t, mode_t, c_void, off_t};
 use libc::{STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
 use err::Errno;
@@ -124,6 +124,17 @@ impl FileDescriptor {
             lseek(self.0, offset as off_t, whence as i32)
         };
         errno_check!(abs_offset, abs_offset as u64)
+    }
+
+    /// The `ftruncate()` system call.
+    ///
+    /// Changes the size of the file to `length` bytes.
+    ///
+    /// Consult the man page (command `man 2 ftruncate`) for further
+    /// details.
+    pub fn ftruncate(&self, length: i64) -> SysResult<()> {
+        let status = unsafe { ftruncate(self.0, length as off_t) };
+        errno_check!(status, ())
     }
 
 }
