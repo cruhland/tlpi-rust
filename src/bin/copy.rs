@@ -44,7 +44,7 @@ fn main_with_io() -> tlpi_rust::err::TlpiResult<()> {
 
     let mut buf = [0u8; BUF_SIZE];
     loop {
-        let bytes_read = match input_fd.read(buf.as_mut_slice()) {
+        let bytes_read = match input_fd.read(&mut buf[..]) {
             Ok(0) => break,
             Ok(bytes) => bytes,
             Err(errno) => return err_exit!(errno, "reading file {}", argv[1])

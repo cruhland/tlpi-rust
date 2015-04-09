@@ -1,6 +1,6 @@
 
 // Using unstable features
-#![feature(libc, io, os, core)]
+#![feature(libc, io)]
 
 extern crate libc;
 

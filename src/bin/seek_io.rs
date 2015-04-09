@@ -9,7 +9,6 @@ extern crate core;
 use std::env;
 use tlpi_rust::fd::*;
 use tlpi_rust::err::*;
-use std::num;
 use Command::*;
 use ReadFormat::*;
 
@@ -51,31 +50,35 @@ fn main_with_result() -> TlpiResult<()> {
     }
 }
 
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 enum Command<'a> {
     Read { byte_count: usize, format: ReadFormat },
     Write { text: &'a str },
     Seek { offset: i64 },
 }
 
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 enum ReadFormat { Text, Hex }
 
 impl<'a> Command<'a> {
 
     fn parse(s: &str) -> TlpiResult<Command> {
         match s.slice_shift_char() {
-            Some(('r', arg)) => {
-                parse_int(arg, "length")
-                    .map(|count| Read { byte_count: count, format: Text })
-            },
-            Some(('R', arg)) => {
-                parse_int(arg, "length")
-                    .map(|count| Read { byte_count: count, format: Hex })
+            Some((mode @ 'r', arg)) | Some((mode @ 'R', arg)) => {
+                match usize::from_str_radix(arg, 10).ok() {
+                    Some(count) => {
+                        let format = if mode == 'r' { Text } else { Hex };
+                        Ok(Read { byte_count: count, format: format })
+                    },
+                    _ => cmd_line_err!("Invalid length: {}", s),
+                }
             },
             Some(('w', arg)) => Ok(Write { text: arg }),
             Some(('s', arg)) => {
-                parse_int(arg, "offset").map(|offset| Seek { offset: offset })
+                match i64::from_str_radix(arg, 10).ok() {
+                    Some(offset) => Ok(Seek { offset: offset }),
+                    _ => cmd_line_err!("Invalid offset: {}", s),
+                }
             },
             _ => cmd_line_err!("Argument must start with [rRws]: {:?}", s),
         }
@@ -85,7 +88,7 @@ impl<'a> Command<'a> {
         match self {
             Read { byte_count, format } => {
                 let mut buf = vec![0u8; byte_count];
-                let num_read = match fd.read(buf.as_mut_slice()) {
+                let num_read = match fd.read(&mut buf[..]) {
                     Ok(count) => count,
                     Err(errno) => return err_exit!(errno, "read"),
                 };
@@ -134,13 +137,6 @@ impl<'a> core::fmt::Display for Command<'a> {
         }
     }
 
-}
-
-fn parse_int<T>(
-    s: &str, into_what: &str
-) -> TlpiResult<T> where T: num::FromStrRadix {
-    let parsed = num::from_str_radix(s, 10);
-    parsed.or_else(|_| cmd_line_err!("Invalid {}: {}", into_what, s))
 }
 
 fn display_bytes(bytes: &[u8], format: ReadFormat) {

@@ -2,7 +2,7 @@
 //! Provides operations on file descriptors.
 
 use std::ffi;
-use std::os;
+use std::io;
 use libc::{open, read, write, close, lseek, ftruncate};
 use libc::{c_int, size_t, mode_t, c_void, off_t};
 use libc::{STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
@@ -31,7 +31,10 @@ pub const STDERR: FileDescriptor = FileDescriptor(STDERR_FILENO);
 /// on a syscall return value and `errno`.
 macro_rules! errno_check {
     ($status:expr, $success:expr) => (
-        if $status == -1 { Err(Errno::new(os::errno())) } else { Ok($success) }
+        {
+            let errno = io::Error::last_os_error().raw_os_error().unwrap();
+            if $status == -1 { Err(Errno::new(errno)) } else { Ok($success) }
+        }
     )
 }
 

@@ -45,7 +45,7 @@ fn main_with_io() -> TlpiResult<()> {
     let mut ends_with_hole = false;
 
     loop {
-        let bytes_read = match input_fd.read(buf.as_mut_slice()) {
+        let bytes_read = match input_fd.read(&mut buf[..]) {
             Ok(0) => break,
             Ok(bytes) => bytes,
             Err(errno) => return err_exit!(errno, "reading file {}", argv[1])
