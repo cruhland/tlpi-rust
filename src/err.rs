@@ -136,7 +136,7 @@ pub fn err_exit_fmt<T>(errno: Errno, fmt: fmt::Arguments) -> TlpiResult<T> {
     let err_in_bounds = err > 0 && (err as usize) < ENAME.len();
     let error_name =
         if err_in_bounds { ENAME[err as usize] } else { "?UNKNOWN?" };
-    let io_error = io::Error::from_os_error(err);
+    let io_error = io::Error::from_raw_os_error(err);
     let detail = format!(" ({})", io_error.to_string());
 
     write_err!(
