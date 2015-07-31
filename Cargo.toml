@@ -7,8 +7,8 @@ authors = [ "Charles Ruhland <cruhland@alumni.cmu.edu>" ]
 
 [dependencies]
 
-bitflags = "0.1.1"
-getopts = "0.2.9"
+bitflags = "0.3.2"
+getopts = "0.2.11"
 
 [[bin]]
 

@@ -1,5 +1,5 @@
 
-#![feature(core, exit_status, libc, str_char)]
+#![feature(core, libc, str_char)]
 
 #[macro_use]
 extern crate tlpi_rust;
@@ -13,7 +13,7 @@ use Command::*;
 use ReadFormat::*;
 
 fn main() {
-    set_exit_status!(main_with_result());
+    exit_with_status!(main_with_result());
 }
 
 fn main_with_result() -> TlpiResult<()> {
@@ -34,15 +34,11 @@ fn main_with_result() -> TlpiResult<()> {
         Err(errno) => return err_exit!(errno, "open")
     };
 
-    let result = {
-        // Need to put this in a block so that `fd` is not borrowed
-        // for the call to `close()` below
-        let result_iter = argv.iter().skip(2).map(|arg| {
-            Command::parse(arg).and_then(|command| command.execute(&fd))
-        });
-
-        std::result::fold(result_iter, (), |v, _| v)
-    };
+    let mut result = Ok(());
+    for arg in argv.iter().skip(2) {
+        result = Command::parse(arg).and_then(|command| command.execute(&fd));
+        if result.is_err() { break }
+    }
 
     match fd.close() {
         Err(errno) => err_exit!(errno, "close"),

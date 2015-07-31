@@ -1,5 +1,5 @@
 
-#![feature(libc, exit_status)]
+#![feature(libc)]
 
 #[macro_use]
 extern crate tlpi_rust;
@@ -10,7 +10,7 @@ use tlpi_rust::fd::*;
 const BUF_SIZE: usize = 1024;
 
 fn main() {
-    set_exit_status!(main_with_io());
+    exit_with_status!(main_with_io());
 }
 
 fn main_with_io() -> tlpi_rust::err::TlpiResult<()> {

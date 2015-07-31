@@ -1,5 +1,5 @@
 
-#![feature(libc, exit_status, collections)]
+#![feature(libc, slice_splits)]
 
 #[macro_use]
 extern crate tlpi_rust;
@@ -12,7 +12,7 @@ use tlpi_rust::fd::*;
 use std::env;
 
 fn main() {
-    set_exit_status!(main_with_result());
+    exit_with_status!(main_with_result());
 }
 
 fn main_with_result() -> TlpiResult<()> {
@@ -57,11 +57,16 @@ fn parse_args() -> TlpiResult<(String, OpenFlags)> {
     let argv: Vec<_> = env::args().collect();
     let opts = build_options();
 
+    let argv_tail = match argv.split_first() {
+        Some((_, tail)) => tail,
+        _ => return cmd_line_err!("No program name provided!?"),
+    };
+
     // Mutable so we can move out the output path
-    let mut matches = match opts.parse(argv.tail()) {
+    let mut matches = match opts.parse(argv_tail) {
         Ok(m) => m,
         Err(f) => {
-            let usage = opts.usage(&f.to_err_msg()[..]);
+            let usage = opts.usage(&f.to_string());
             return cmd_line_err!("{}", usage)
         },
     };

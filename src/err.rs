@@ -91,18 +91,19 @@ macro_rules! cmd_line_err {
     )
 }
 
-/// Sets the exit status of the program from an expression.
+/// Terminates the program with the exit status supplied by the given
+/// expression.
 ///
 /// The expression must be of type `Result`: `Ok` indicates success;
 /// `Err` indicates failure.
 #[macro_export]
-macro_rules! set_exit_status {
+macro_rules! exit_with_status {
     ($result:expr) => (
         {
             use ::tlpi_rust::err::{EXIT_SUCCESS, EXIT_FAILURE};
             let status =
                 if $result.is_ok() { EXIT_SUCCESS } else { EXIT_FAILURE };
-            std::env::set_exit_status(status);
+            std::process::exit(status);
         }
     )
 }

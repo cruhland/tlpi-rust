@@ -1,5 +1,5 @@
 
-#![feature(libc, exit_status, collections)]
+#![feature(libc)]
 
 #[macro_use]
 extern crate tlpi_rust;
@@ -12,7 +12,7 @@ use Region::*;
 const BUF_SIZE: usize = 1 << 16; // 64k
 
 fn main() {
-    set_exit_status!(main_with_io());
+    exit_with_status!(main_with_io());
 }
 
 fn main_with_io() -> TlpiResult<()> {
@@ -35,14 +35,14 @@ fn main_with_io() -> TlpiResult<()> {
 
 fn open_input(path: &str) -> TlpiResult<FileDescriptor> {
     let empty_perms = FilePerms::empty();
-    FileDescriptor::open(String::from_str(path), O_RDONLY, empty_perms)
+    FileDescriptor::open(String::from(path), O_RDONLY, empty_perms)
         .or_else(|errno| err_exit!(errno, "opening input file {}", path))
 }
 
 fn open_output(path: &str) -> TlpiResult<FileDescriptor> {
     let open_flags = O_CREAT | O_WRONLY | O_TRUNC;
     let file_perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-    FileDescriptor::open(String::from_str(path), open_flags, file_perms)
+    FileDescriptor::open(String::from(path), open_flags, file_perms)
         .or_else(|errno| err_exit!(errno, "opening output file {}", path))
 }
 
@@ -159,7 +159,7 @@ impl<'a> BulkWriter<'a> {
             let capacity_index = bytes_buffered + self.buffer.capacity();
             let end = std::cmp::min(capacity_index, data.len());
             let slice = &data[bytes_buffered..end];
-            self.buffer.push_all(slice);
+            self.buffer.extend(slice);
             bytes_buffered += slice.len();
         }
 
