@@ -1,11 +1,11 @@
 - Soon
   - Exercise 4-2, copy file with holes
-    - Add code comments
-    - Allow implementation to use new SEEK_DATA, SEEK_HOLE params
+    - Allow implementation to use new `SEEK_DATA`, `SEEK_HOLE` params
 - Later
-  - Get rid of deprecation warnings for std::os::errno()
-    - Either get direct access to the errno value,
-    - or determine the UNIX error name from std::io::Error
+  - Get rid of deprecation warnings for `std::os::errno()`
+    - Either get direct access to the `errno` value,
+    - or determine the UNIX error name from `std::io::Error`
   - Add optional logging to library functions, to help with debugging
   - Provide script for generating the `ENAME` array in `err.rs`
-  - Provide script for generating tlpi_rust::util::OpenFlags from a C header file
+  - Provide script for generating `tlpi_rust::util::OpenFlags` from a
+    C header file
